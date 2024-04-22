@@ -1,0 +1,32 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=yes">
+<title>HDR - Assignment 6</title>
+<link type="text/css" href="style.css" rel="stylesheet" />
+</head>
+
+<body>
+
+<div class="description">
+Select one image.
+</div>
+
+<div>
+    <input type="file" id="load_image" multiple>
+</div>
+
+<p align="center">
+    <p align="center"> Gamma <span id="camXLabelID"></span></p>
+    <input type="range" id="gammaID" name="gamma"
+           value="0" min="-3" max="0" step="0.01" style="width:100%" >
+</p>
+
+<canvas id="canvas"></canvas>
+
+</body>
+
+<script src="a06.js"></script>
+<script src="hdr.js"></script>
+</html>
