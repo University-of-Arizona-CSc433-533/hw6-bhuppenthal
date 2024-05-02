@@ -187,7 +187,7 @@ function parseHdr(buffer) {
         var g = data[offset+1]/255;
         var b = data[offset+2]/255;
         var e = data[offset+3];
-        var f = Math.pow(2.0, e - 128.0)
+        var f = Math.pow(2.0, e - 128.0);
 
         r *= f;
         g *= f;

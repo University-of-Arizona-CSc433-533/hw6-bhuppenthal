@@ -27,10 +27,7 @@ function readImage() {
             let loaded_image = parseHdr(file_data);
             console.log(loaded_image);
 
-            let width = loaded_image.shape[0];
-            let height = loaded_image.shape[1];
-
-            hdr_image = new FloatWrapper(width, height, array=loaded_image.data);
+            hdr_image = new FloatWrapper(loaded_image.shape[0], loaded_image.shape[1], array=loaded_image.data);
             console.log(hdr_image);
 
         }
@@ -60,7 +57,7 @@ function renderImage() {
             let L = (20.0*r + 40.0*g + b)/61.0;
             let scale = L**gamma / L;
 
-            rgb_values.setIdx(i, j, [scale*r, scale*g, scale*b, 255]);
+            rgb_values.setIdx(i, j, [255*scale*r, 255*scale*g, 255*scale*b, 255]);
         }
     }
 
