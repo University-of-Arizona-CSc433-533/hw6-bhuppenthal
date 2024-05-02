@@ -49,7 +49,8 @@ function renderImage() {
     canvas.width = width;
     canvas.height = height;
 
-    // create gamma corrected image
+    // Attempts to perform gamma correction per Part 2: Basic Tone Mapping.
+    // This does not act like I expect it would (requires negative gamma) and perhaps we can just skip this step completely.
     var rgb_values = new Uint8Wrapper(width, height);
 
     for(var i=0; i < height; i++){
