@@ -74,34 +74,38 @@ function clamp(val){
     return Math.max(Math.min(1,val),0);
 }
 
-function spatialGaussian(pos1, pos2){
+function spatialGaussian(oldx, oldy, newx, newy){
     // Calculates the spatial portion of the convolution.
 
     // I am assuming this is gonna be exp(-d^2) where distance here is the literal distance between the points.
     // For now I am just going to return 1 though.
-    return  1;
+    distance = Math.pow(Math.pow((oldx-oldy),2)+Math.pow((newx,newy),2),0.5);
+    
+    return  Math.exp(-clamp(Math.pow(distance,2)));
 }
 
 function intensityGaussian(xold, outer){
     // Calculates the intensity portion of the convolution.
     // Using exp(-clamp((log(Lold) - log(Louter)^2))).
-    intensity = Math.exp(-(Math.pow(clamp(Math.log(xold) - Math.log(outer)),2)));
-    return intensity;
+    return Math.exp(-(Math.pow(clamp(Math.log(xold) - Math.log(outer)),2)));
 }
 
 function calculateScaleFactor(luminanceArray, row, col){
     // Calculates k(x), the normalization constant. 
 
     scaleFactor = 0;
-    for(leftShift = -10; leftShift < 10; leftShift++){
-        for(upShift = -10; upShift < 10; upShift++){
-            // for spatial gaussian. 
+    for(leftShift = -10; leftShift <= 10; leftShift++){
+        for(upShift = -10; upShift <= 10; upShift++){
+            // Calculate contribution from space.
             spatialContribution = spatialGaussian(luminanceArray.getIdx(row,col),luminanceArray.getIdx(row+leftShift,col+upShift));
+            // Calculate contribution from luminance.
             intensityContribution = intensityGaussian(luminanceArray.getIdx(row,col),luminanceArray.getidx(row+leftShift,col+upShift));
+            // Add to the total scale factor.
             scaleFactor += spatialContribution*intensityContribution;
         }
     }
 
+    // Return the value that will be used to normalize.
     return scaleFactor;
 }
 
@@ -130,14 +134,17 @@ function lowPass(luminanceArray) {
             // and 10 up and down 
             lowPassArray.setIdx(row-10,col-10) = 0.0;
             scaleFactor = calculateScaleFactor(luminanceArray,row,col);
-            for(leftShift = -10; leftShift < 10; leftShift++){
-                for(upShift = -10; upShift < 10; upShift++){
-                    // for spatial gaussian. 
-                    spatialContribution = spatialGaussian(luminanceArray.getIdx(row,col),luminanceArray.getIdx(row+leftShift,col+upShift));
-                    intensityContribution = intensityGaussian(luminanceArray.getIdx(row,col),luminanceArray.getidx(row+leftShift,col+upShift));
-                    logLuminance = Math.log(luminanceArray.getIdx(row,col));
 
-                    lowPassArray.setIdx(row-10,col-10 , lowPassArray.getIdx(row-10,col-10) +logLuminance*spatialContribution*intensityContribution); // Add contribution to sum of this neighbor.
+            for(leftShift = -10; leftShift <= 10; leftShift++){
+                for(upShift = -10; upShift <= 10; upShift++){
+                    // Calculate the contribution of the gaussian in space.. 
+                    spatialContribution = spatialGaussian(col,row,col+upShift,row+leftShift);
+                    // Calculate the contribution of the gaussian w.r.t intensity. 
+                    intensityContribution = intensityGaussian(luminanceArray.getIdx(row,col),luminanceArray.getidx(row+leftShift,col+upShift));
+                    // Log of the luminance. 
+                    logLuminance = Math.log(luminanceArray.getIdx(row,col));
+                    // Convolve and update the values in the lowPassArray.
+                    lowPassArray.setIdx(row-10,col-10 , lowPassArray.getIdx(row-10,col-10) +logLuminance*spatialContribution*intensityContribution);
                 }
             }
             lowPassArray.setIdx(row-10,col-10, lowPassArray.getIdx(row-10,col-10)/scaleFactor); // We have summed over all 21x21 neighbors. 
@@ -168,8 +175,8 @@ function highPass(lowPassArray, luminanceArray){
 function gammaCorrect(lowPassArray, highPassArray, gammaParam){
     const width = lowPassArray.width;
     const height = lowPassArray.height;
-
-
+    // lowPassArray and highPassArray ARE the same dimensions.
+    
     // Parameter used for gamma, gammaParam in [5,100]
     max = lowPassArray.getIdx(0,0);
     min = lowPassArray.getIdx(0,0);
@@ -199,7 +206,7 @@ function gammaCorrect(lowPassArray, highPassArray, gammaParam){
     return newLuminanceArray;
 }
 
-function finalizeImage(originalLuminaceArray, updatedLuminanceArray, image){
+function finalizeImage(originalLuminanceArray, updatedLuminanceArray, image){
     // Calculate scale for each pixel. 
 
     // Calculate the new RGB in the image 
@@ -215,10 +222,11 @@ function finalizeImage(originalLuminaceArray, updatedLuminanceArray, image){
         scaleFactor = updatedLuminanceArray.getIdx(row,col)/originalLuminanceArray.getIdx(row+10,col+10); // Calculate the scale factor used.
 
         newImage.setIdx(row,col, image.getIdx(row+10,col+10)*scaleFactor);                                // Set the pixel in the new image 
-                                                                                                            // to be the old RGB times the scalefactor.
+                                                                                                          // to be the old RGB times the scalefactor.
 
         }
     }
 
+    // Recall that newImage IS OF SMALLER DIMENSION (20 less in x, 20 less in y)
     return newImage;
 }
