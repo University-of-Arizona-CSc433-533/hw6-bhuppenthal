@@ -1,19 +1,31 @@
-var canvas = document.getElementById('canvas');
-var ctx = canvas.getContext('2d');
+var canvasB = document.getElementById('canvasB');
+var ctxB = canvasB.getContext('2d');
+
+var canvasC = document.getElementById('canvasC');
+var ctxC = canvasC.getContext('2d');
 
 var input = document.getElementById("load_image");
 input.addEventListener("change", readImage);
 
-var gamma;
 var gamma_elem = document.getElementById('gammaID');
+var gamma = gamma_elem.value;
 gamma_elem.addEventListener('change', function (e) {
     gamma = parseFloat(gamma_elem.value);
-    console.log('gamma:', gamma);
-    renderImage();
+    renderBasicGammaCorrection();
 });
 
+var c_elem = document.getElementById('contrastID');
+var c = c_elem.value;
+c_elem.addEventListener('change', function (e) {
+    c = parseFloat(c_elem.value);
+
+    // INFO: any time the contrast threshold is changed, will call the rendering method.
+    // This is why I have the hdr_image stored as a global variable.
+    renderBilateralFilters();
+})
+
 var hdr_image;
-var corrected_img;
+var basic_gamma_img;
 
 function readImage() {
     doneLoading = false;
@@ -27,7 +39,7 @@ function readImage() {
             let loaded_image = parseHdr(file_data);
             console.log(loaded_image);
 
-            hdr_image = new FloatWrapper(loaded_image.shape[0], loaded_image.shape[1], array=loaded_image.data);
+            hdr_image = new FloatArrayWrapper(loaded_image.shape[0], loaded_image.shape[1], array=loaded_image.data);
             console.log(hdr_image);
 
         }
@@ -39,15 +51,21 @@ function readImage() {
 }
 
 function renderImage() {
-    console.log('rendering!');
+    // Called after a file is loaded and read into hdr_image.
+    renderBasicGammaCorrection();
+    renderBilateralFilters();
+}
+
+function renderBasicGammaCorrection() {
+    // For Part B. The only element of interest is the final line in the nested for loops,
+    // as well as the ImageData creation and write to the canvas.
+    console.log(gamma);
     let width = hdr_image.width;
     let height = hdr_image.height;
 
-    canvas.width = width;
-    canvas.height = height;
+    canvasB.width = width;
+    canvasB.height = height;
 
-    // Attempts to perform gamma correction per Part 2: Basic Tone Mapping.
-    // This does not act like I expect it would (requires negative gamma) and perhaps we can just skip this step completely.
     var rgb_values = new Uint8Wrapper(width, height);
 
     for(var i=0; i < height; i++){
@@ -61,9 +79,13 @@ function renderImage() {
         }
     }
 
-    // make a new image data and write that to the canvas.
-    corrected_img = new ImageData(rgb_values.array, width, height);
-    ctx.putImageData(corrected_img, 0, 0);
+    basic_gamma_img = new ImageData(rgb_values.array, width, height);
+    ctxB.putImageData(basic_gamma_img, 0, 0);
+}
+
+function renderBilateralFilters() {
+    // TODO main function for Part C logic.
+    console.log('pass on bilateral filters');
 }
 
 function clamp(val){
@@ -76,25 +98,25 @@ function spatialGaussian(pos1, pos2){
 
     // I am assuming this is gonna be exp(-d^2) where distance here is the literal distance between the points.
     // For now I am just going to return 1 though.
-    return  1;
+    return 1;
 }
 
 function intensityGaussian(xold, outer){
     // Calculates the intensity portion of the convolution.
     // Using exp(-clamp((log(Lold) - log(Louter)^2))).
-    intensity = Math.exp(-(Math.pow(clamp(Math.log(xold) - Math.log(outer)),2)));
+    let intensity = Math.exp(-(Math.pow(clamp(Math.log(xold) - Math.log(outer)),2)));
     return intensity;
 }
 
 function calculateScaleFactor(luminanceArray, row, col){
     // Calculates k(x), the normalization constant. 
 
-    scaleFactor = 0;
+    let scaleFactor = 0;
     for(leftShift = -10; leftShift < 10; leftShift++){
         for(upShift = -10; upShift < 10; upShift++){
             // for spatial gaussian. 
-            spatialContribution = spatialGaussian(luminanceArray.getIdx(row,col),luminanceArray.getIdx(row+leftShift,col+upShift));
-            intensityContribution = intensityGaussian(luminanceArray.getIdx(row,col),luminanceArray.getidx(row+leftShift,col+upShift));
+            let spatialContribution = spatialGaussian(luminanceArray.getIdx(row,col),luminanceArray.getIdx(row+leftShift,col+upShift));
+            let intensityContribution = intensityGaussian(luminanceArray.getIdx(row,col),luminanceArray.getidx(row+leftShift,col+upShift));
             scaleFactor += spatialContribution*intensityContribution;
         }
     }
@@ -114,7 +136,7 @@ function lowPass(luminanceArray) {
     // Get the luminance height. 
     const height = luminanceArray.height;
 
-    const lowPassArray = ArrayClass(height-20,width-20);
+    const lowPassArray = FloatArrayWrapper(width-20, height-20);
 
     // Double for loop over the interior. Using a 21x21 filter.
     //
@@ -126,18 +148,21 @@ function lowPass(luminanceArray) {
             // Now loop over neighbors 10 to left and right,
             // and 10 up and down 
             lowPassArray.setIdx(row-10,col-10) = 0.0;
-            scaleFactor = calculateScaleFactor(luminanceArray,row,col);
+            let scaleFactor = calculateScaleFactor(luminanceArray,row,col);
             for(leftShift = -10; leftShift < 10; leftShift++){
                 for(upShift = -10; upShift < 10; upShift++){
                     // for spatial gaussian. 
-                    spatialContribution = spatialGaussian(luminanceArray.getIdx(row,col),luminanceArray.getIdx(row+leftShift,col+upShift));
-                    intensityContribution = intensityGaussian(luminanceArray.getIdx(row,col),luminanceArray.getidx(row+leftShift,col+upShift));
-                    logLuminance = Math.log(luminanceArray.getIdx(row,col));
-
-                    lowPassArray.setIdx(row-10,col-10 , lowPassArray.getIdx(row-10,col-10) +logLuminance*spatialContribution*intensityContribution); // Add contribution to sum of this neighbor.
+                    let spatialContribution = spatialGaussian(luminanceArray.getIdx(row,col),luminanceArray.getIdx(row+leftShift,col+upShift));
+                    let intensityContribution = intensityGaussian(luminanceArray.getIdx(row,col),luminanceArray.getidx(row+leftShift,col+upShift));
+                    let logLuminance = Math.log(luminanceArray.getIdx(row,col));
+                    
+                    // Add contribution to sum of this neighbor.
+                    lowPassArray.setIdx(row-10,col-10,lowPassArray.getIdx(row-10,col-10) + logLuminance*spatialContribution*intensityContribution);
                 }
             }
-            lowPassArray.setIdx(row-10,col-10, lowPassArray.getIdx(row-10,col-10)/scaleFactor); // We have summed over all 21x21 neighbors. 
+            // INFO : updated object getIdx is called on to get values from luminance (=hdr_image) and scale appropriately
+            // INFO : keep lowPassArray/highPassArray as floats, just need to remember to *255 when setting up the final image
+            lowPassArray.setIdx(row-10, col-10, luminanceArray.getIdx(row-10,col-10)/scaleFactor); // We have summed over all 21x21 neighbors. 
         }
     }
 
@@ -149,13 +174,13 @@ function highPass(lowPassArray, luminanceArray){
     const width = lowPassArray.width;
     const height = lowPassArray.height;
 
-    const highPassArray = (height,width);
+    const highPassArray = (width, height);
 
     // Keep in mind that the highPass array is missing 10 rows on the top and bottom and 10 rows on the left and right.
 
     for(col = 0; col < width; col++){
         for(row = 0; row < height; row++){
-        highPassArray.setIdx(row,col,Math.log(luminanceArray.getIdx(row+10,col+10)) - lowPassArray.getIdx(row+10,col+10));
+            highPassArray.setIdx(row,col,Math.log(luminanceArray.getIdx(row+10,col+10)) - lowPassArray.getIdx(row+10,col+10));
         }              
     }
 
@@ -180,14 +205,14 @@ function gammaCorrect(lowPassArray, highPassArray, gammaParam){
     }
 
     // Calculate gamma.
-    const gamma = Math.log(gammaParam)/(max-min); 
+    const gamma = Math.log(c)/(max-min); 
 
-    const newLuminanceArray = [];
+    const newLuminanceArray = new FloatArrayWrapper(width, height);
     // Gamma corrects the image to calculate the Log(L')
     // array.
 
     for(col = 0; col < width; col++){
-        for(row =0; row < height; row++){
+        for(row = 0; row < height; row++){
         logLuminance = gamma*lowPassArray.getIdx(row,col) + highPassArray.getIdx(row,col);
         newLuminanceArray.setIdx(row,col, Math.exp(logLuminance));
         }

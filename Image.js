@@ -1,4 +1,4 @@
-class FloatWrapper{
+class FloatArrayWrapper{
     constructor(width, height, array=null) {
         if (array === null) {
             this.array = new Float32Array(4*height*width);
@@ -10,7 +10,6 @@ class FloatWrapper{
     }
 
     getIdx = (row, col) => {
-
         if(row < 0 || row >= this.height || col < 0 || col >= this.width){
             throw new Error('OOB');
         }
@@ -45,9 +44,8 @@ class Uint8Wrapper{
     }
 
     getIdx = (row, col) => {
-
         if(row < 0 || row >= this.height || col < 0 || col >= this.width){
-            throw new Error('OOB')
+            throw new Error('OOB');
         }
 
         var i = 4 * this.width * row + 4 * col;
